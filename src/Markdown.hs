@@ -7,21 +7,21 @@ module Markdown
   , HeadingType
   ) where
 
-data Block = Paragraph [Inline]
-           | Headering HeadingType [Inline]
-           | Quote [Inline]
-           | List ListType [[Inline]]
-           | Divider
-           | Code Language Code deriving (Eq, Show)
+data Block = Paragraph Index [Inline]
+           | Headering HeadingType Index [Inline]
+           | Quote Index [Inline]
+           | List Index ListType [[Inline]]
+           | Divider Index
+           | Code Index Language Code deriving (Eq, Show)
 
 data HeadingType = H1 | H2 | H3 | H4 | H5 | H6 deriving (Eq, Show, Enum)
 
-data Inline = Link LinkName LinkAddress
-            | Image ImageAlt ImageAddress
-            | Text String
-            | Italic [Inline]
-            | Strong [Inline]
-            | InlineCode Code deriving (Eq, Show)
+data Inline = Link Index LinkName LinkAddress
+            | Image Index ImageAlt ImageAddress
+            | Text Index String
+            | Italic Index [Inline]
+            | Strong Index [Inline]
+            | InlineCode Index Code deriving (Eq, Show)
 
 data ListType = OrderedList | UnorderedList deriving (Eq, Show)
 
@@ -33,3 +33,5 @@ type LinkName = String
 type LinkAddress = String
 type ImageAlt = String
 type ImageAddress = String
+
+type Index = Int

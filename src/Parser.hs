@@ -8,10 +8,10 @@ import Text.Parsec.String
 import Markdown
 import Control.Monad ( guard )
 
-parserMarkdown :: Parser Markdown
+parserMarkdown :: Parsec String Int Markdown
 parserMarkdown = many parseBlock <* eof
 
-parseBlock :: Parser Block
+parseBlock :: Parsec String Int Block
 parseBlock = choice [ try parseHeading
                     , try parseQuote
                     , try parseList
@@ -19,62 +19,87 @@ parseBlock = choice [ try parseHeading
                     , try parseCode
                     , parseParagraph ]
 
-parseHeading :: Parser Block
+parseHeading :: Parsec String Int Block
 parseHeading = do
   chars <- many1 $ char '#'
   let charL = length chars
   guard (charL <= 6)
   spaces''
   inlines <- parseInlines
-  return $ Headering (toEnum $ pred charL) inlines
+  modifyState (+1)
+  index <- getState
+  return $ Headering (toEnum $ pred charL) index inlines
 
-parseQuote :: Parser Block
-parseQuote = (char '>' <* spaces'') >> (parseInlines >>= return . Quote)
+parseQuote :: Parsec String Int Block
+parseQuote = do
+  char '>' <* spaces''
+  inlines <- parseInlines
+  modifyState (+1)
+  index <- getState
+  return $ Quote index inlines
 
-parseList :: Parser Block
+parseList :: Parsec String Int Block
 parseList = parseOrderedList <|> parseUnorderedList
-  where parseOrderedList :: Parser Block
-        parseOrderedList = many1 orderedListItem >>= return . List OrderedList
+  where parseOrderedList :: Parsec String Int Block
+        parseOrderedList = do
+          inlines <- many1 orderedListItem
+          modifyState (+1)
+          index <- getState
+          return $ List index OrderedList inlines
 
-        orderedListItem :: Parser [Inline]
+        orderedListItem :: Parsec String Int [Inline]
         orderedListItem = ((many1 digit >> oneOf ".)") <* spaces'') >> parseInlines
 
-        parseUnorderedList :: Parser Block
-        parseUnorderedList = many1 unorderedListItem >>= return . List UnorderedList
+        parseUnorderedList :: Parsec String Int Block
+        parseUnorderedList = do
+          inlines <- many1 unorderedListItem
+          modifyState (+1)
+          index <- getState
+          return $ List index UnorderedList inlines
 
-        unorderedListItem :: Parser [Inline]
+        unorderedListItem :: Parsec String Int [Inline]
         unorderedListItem = ((oneOf "*-") <* spaces'') >> parseInlines
 
-parseDivider :: Parser Block
+parseDivider :: Parsec String Int Block
 parseDivider = (hyphen <|> asterisk) <* spaces' <* endOfLine
-  where hyphen :: Parser Block
+  where hyphen :: Parsec String Int Block
         hyphen = do
           chars <- many1 $ char '-'
           guard (length chars >= 3)
-          return Divider
+          modifyState (+1)
+          index <- getState
+          return $ Divider index
         
-        asterisk :: Parser Block
+        asterisk :: Parsec String Int Block
         asterisk = do
           chars <- many1 $ char '*'
           guard (length chars >= 3)
-          return Divider
+          modifyState (+1)
+          index <- getState
+          return $ Divider index
 
-parseCode :: Parser Block
+parseCode :: Parsec String Int Block
 parseCode = do
   string "```"
   language <- between' spaces' (spaces' <* endOfLine) anyChar
   code <- manyTill anyChar (string "```")
   spaces'
   endOfLine
-  return $ Code (if null language then Nothing else Just language) code
+  modifyState (+1)
+  index <- getState
+  return $ Code index (if null language then Nothing else Just language) code
 
-parseParagraph :: Parser Block
-parseParagraph = parseInlines >>= return . Paragraph
+parseParagraph :: Parsec String Int Block
+parseParagraph = do
+  inlines <- parseInlines
+  modifyState (+1)
+  index <- getState
+  return $ Paragraph index inlines
 
-parseInlines :: Parser [Inline]
+parseInlines :: Parsec String Int [Inline]
 parseInlines = manyTill parseInline endOfLine
 
-parseInline :: Parser Inline
+parseInline :: Parsec String Int Inline
 parseInline = choice [ try parseLink
                      , try parseImage
                      , try parseInlineCode
@@ -82,50 +107,66 @@ parseInline = choice [ try parseLink
                      , try parseItalic
                      , parseString ]
 
-parseLink :: Parser Inline
+parseLink :: Parsec String Int Inline
 parseLink = do
   name <- between' (char '[') (char ']') anyChar
   address <- between' (char '(') (char ')') anyChar
-  return $ Link name address
+  modifyState (+1)
+  index <- getState
+  return $ Link index name address
 
-parseInlineCode :: Parser Inline
+parseInlineCode :: Parsec String Int Inline
 parseInlineCode = do
   code <- between' (char '`') (char '`') anyChar
-  return $ InlineCode code
+  modifyState (+1)
+  index <- getState
+  return $ InlineCode index code
 
-parseImage :: Parser Inline
+parseImage :: Parsec String Int Inline
 parseImage = do
   alt <- between' (string "![") (char ']') anyChar
   address <- between' (char '(') (char ')') anyChar
-  return $ Image alt address
+  modifyState (+1)
+  index <- getState
+  return $ Image index alt address
 
-parseItalic :: Parser Inline
+parseItalic :: Parsec String Int Inline
 parseItalic = parseItalicWith '*' <|> parseItalicWith '_'
   where
-    parseItalicWith :: Char -> Parser Inline
-    parseItalicWith token = betweenItalic token (char token) (char token) parseInline >>= return . Italic
-      where
-        betweenItalic :: Char -> Parser a -> Parser b -> Parser c -> Parser [c]
-        betweenItalic token a b c = a *> manyTill c (try ( do
+    parseItalicWith :: Char -> Parsec String Int Inline
+    parseItalicWith token = do
+      inlines <- betweenItalic token (char token) (char token) parseInline
+      modifyState (+1)
+      index <- getState
+      return $ Italic index inlines
+        where
+          betweenItalic :: Char -> Parsec String Int a -> Parsec String Int b -> Parsec String Int c -> Parsec String Int [c]
+          betweenItalic token a b c = a *> manyTill c (try ( do
                               { b ; notFollowedBy (char token) }))
 
-parseStrong :: Parser Inline
+parseStrong :: Parsec String Int Inline
 parseStrong = parseStrongWith "**" <|> parseStrongWith "__"
   where
-      parseStrongWith :: String -> Parser Inline
-      parseStrongWith token = between' (string token) (string token) parseInline >>= return . Strong
+      parseStrongWith :: String -> Parsec String Int Inline
+      parseStrongWith token = do
+        inlines <- between' (string token) (string token) parseInline
+        modifyState (+1)
+        index <- getState
+        return $ Strong index inlines
 
-parseString :: Parser Inline
+parseString :: Parsec String Int Inline
 parseString = do
   c <- anyChar -- Explicitly take one char to avoid empty strings
   cs <- manyTill anyChar (lookAhead $ oneOf "![*_" <|> endOfLine)
-  return $ Text (c:cs)
+  modifyState (+1)
+  index <- getState
+  return $ Text index (c:cs)
 
-between' :: Parser a -> Parser b -> Parser c -> Parser [c]
+between' :: Parsec String Int a -> Parsec String Int b -> Parsec String Int c -> Parsec String Int [c]
 between' a b c = a *> manyTill c (try b)
 
-spaces' :: Parser ()
+spaces' :: Parsec String Int ()
 spaces' = skipMany (char ' ')
 
-spaces'' :: Parser ()
+spaces'' :: Parsec String Int ()
 spaces'' = skipMany1 (char ' ')

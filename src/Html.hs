@@ -10,28 +10,28 @@ genHtml [] = ""
 genHtml (x:xs) = htmlBlock x <> genHtml xs
 
 htmlBlock :: Block -> Html
-htmlBlock (Paragraph xs) = "<p>" <> htmlInlines xs <> "</p>"
-htmlBlock (Headering t xs) = "<h" <> show (fromEnum (succ t)) <> ">"
+htmlBlock (Paragraph _ xs) = "<p>" <> htmlInlines xs <> "</p>"
+htmlBlock (Headering t _ xs) = "<h" <> show (fromEnum (succ t)) <> ">"
                                   <> htmlInlines xs
                                   <> "</h" <> show (fromEnum (succ t)) <> ">"
-htmlBlock (Quote xs) = "<blockquote>" <> htmlInlines xs <> "</blockquote>"
-htmlBlock (List OrderedList xs) = "<ol>" <> concatMap (\x -> "<li>" <> htmlInlines x <> "</li>") xs <> "</ol>"
-htmlBlock (List UnorderedList xs) = "<ul>" <> concatMap (\x -> "<li>" <> htmlInlines x <> "</li>") xs <> "</ul>"
-htmlBlock Divider = "<hr />"
-htmlBlock (Code Nothing code) = "<pre><code>" <> text code <> "</code></pre>"
-htmlBlock (Code (Just language) code) = "<pre><code class=\"" <> language <> "\">" <> text code <> "</code></pre>"
+htmlBlock (Quote _ xs) = "<blockquote>" <> htmlInlines xs <> "</blockquote>"
+htmlBlock (List _ OrderedList xs) = "<ol>" <> concatMap (\x -> "<li>" <> htmlInlines x <> "</li>") xs <> "</ol>"
+htmlBlock (List _ UnorderedList xs) = "<ul>" <> concatMap (\x -> "<li>" <> htmlInlines x <> "</li>") xs <> "</ul>"
+htmlBlock (Divider _) = "<hr />"
+htmlBlock (Code _ Nothing code) = "<pre><code>" <> text code <> "</code></pre>"
+htmlBlock (Code _ (Just language) code) = "<pre><code class=\"" <> language <> "\">" <> text code <> "</code></pre>"
 
 htmlInlines :: [Inline] -> Html
 htmlInlines [] = ""
 htmlInlines (x:xs) = htmlInline x <> htmlInlines xs
 
 htmlInline :: Inline -> Html
-htmlInline (Link name address) = "<a href=\"" <> address <> "\">" <> text name <> "</a>"
-htmlInline (Image alt address) = "<img src=\"" <> address <> "\" alt=\"" <> alt <> "\" />"
-htmlInline (Text str) = text str
-htmlInline (Italic xs) = "<em>" <> htmlInlines xs <> "</em>"
-htmlInline (Strong xs) = "<strong>" <> htmlInlines xs <> "</strong>"
-htmlInline (InlineCode code) = "<code>" <> text code <> "</code>"
+htmlInline (Link _ name address) = "<a href=\"" <> address <> "\">" <> text name <> "</a>"
+htmlInline (Image _ alt address) = "<img src=\"" <> address <> "\" alt=\"" <> alt <> "\" />"
+htmlInline (Text _ str) = text str
+htmlInline (Italic _ xs) = "<em>" <> htmlInlines xs <> "</em>"
+htmlInline (Strong _ xs) = "<strong>" <> htmlInlines xs <> "</strong>"
+htmlInline (InlineCode _ code) = "<code>" <> text code <> "</code>"
 
 type Html = String
 
