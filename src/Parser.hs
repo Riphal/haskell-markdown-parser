@@ -37,13 +37,13 @@ parseList = parseOrderedList <|> parseUnorderedList
         parseOrderedList = many1 orderedListItem >>= return . List OrderedList
 
         orderedListItem :: Parser [Inline]
-        orderedListItem = ((many1 digit >> char '.') <* spaces'') >> parseInlines
+        orderedListItem = ((many1 digit >> oneOf ".)") <* spaces'') >> parseInlines
 
         parseUnorderedList :: Parser Block
         parseUnorderedList = many1 unorderedListItem >>= return . List UnorderedList
 
         unorderedListItem :: Parser [Inline]
-        unorderedListItem = ((oneOf "-*+") <* spaces'') >> parseInlines
+        unorderedListItem = ((oneOf "*-") <* spaces'') >> parseInlines
 
 parseDivider :: Parser Block
 parseDivider = (hyphen <|> asterisk) <* spaces' <* endOfLine
@@ -61,14 +61,12 @@ parseDivider = (hyphen <|> asterisk) <* spaces' <* endOfLine
 
 parseCode :: Parser Block
 parseCode = do
-  codeSymbol
+  string "```"
   language <- between' spaces' (spaces' <* endOfLine) anyChar
-  code <- manyTill anyChar codeSymbol
+  code <- manyTill anyChar (string "```")
   spaces'
   endOfLine
   return $ Code (if null language then Nothing else Just language) code
-  where codeSymbol :: Parser String
-        codeSymbol = count 3 (char '`')
 
 parseParagraph :: Parser Block
 parseParagraph = parseInlines >>= return . Paragraph
@@ -102,21 +100,25 @@ parseImage = do
   return $ Image alt address
 
 parseItalic :: Parser Inline
-parseItalic = betweenItalic (char '*') (char '*') parseInline >>= return . Italic
+parseItalic = parseItalicWith '*' <|> parseItalicWith '_'
   where
-    betweenItalic :: Parser a -> Parser b -> Parser c -> Parser [c]
-    betweenItalic a b c = a *> manyTill c (try ( do
-                          { b
-                          ; notFollowedBy (char '*')
-                          }))
+    parseItalicWith :: Char -> Parser Inline
+    parseItalicWith token = betweenItalic token (char token) (char token) parseInline >>= return . Italic
+      where
+        betweenItalic :: Char -> Parser a -> Parser b -> Parser c -> Parser [c]
+        betweenItalic token a b c = a *> manyTill c (try ( do
+                              { b ; notFollowedBy (char token) }))
 
 parseStrong :: Parser Inline
-parseStrong = between' (string "**") (string "**") parseInline >>= return . Strong
+parseStrong = parseStrongWith "**" <|> parseStrongWith "__"
+  where
+      parseStrongWith :: String -> Parser Inline
+      parseStrongWith token = between' (string token) (string token) parseInline >>= return . Strong
 
 parseString :: Parser Inline
 parseString = do
-  c <- anyChar
-  cs <- manyTill anyChar (lookAhead $ oneOf "![*" <|> endOfLine)
+  c <- anyChar -- Explicitly take one char to avoid empty strings
+  cs <- manyTill anyChar (lookAhead $ oneOf "![*_" <|> endOfLine)
   return $ Text (c:cs)
 
 between' :: Parser a -> Parser b -> Parser c -> Parser [c]

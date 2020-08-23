@@ -14,8 +14,6 @@ bug-reports:    https://github.com/Riphal/haskell-markdown-parser/issues
 author:         riphal
 maintainer:     ""
 copyright:      ""
-license:        MIT
-license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
     README.md
