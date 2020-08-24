@@ -60,6 +60,15 @@ testTree = [
               Italic 5 [
                 Text 4 "Italic"
               ]
+            ],
+            Paragraph 7 [
+              Italic 8 [
+                Text 9 "Italic"
+              ],
+              Text 10 " \t",
+              Italic 11 [
+                Text 12 "Italic"
+              ]
             ]
           ]
 
@@ -79,32 +88,28 @@ zipperUp (block, inline, (MDCrumb index ItalicItem ls rs):bs) = (block, Italic i
 zipperUp (block, inline, (MDCrumb index StrongItem ls rs):bs) = (block, Strong index (ls ++ [inline] ++ rs), bs)
 
 
-inlineTo :: Index -> Maybe Zipper -> Maybe Zipper
+inlineTo :: Index -> Zipper -> Maybe Zipper
 -- Parse for Paragraph
-inlineTo index (Just (Paragraph index' items, None, bs)) =
+inlineTo index (Paragraph index' items, None, bs) =
     let (ls, rs) = break (zipperIs index) items
         block = Paragraph index' items
-    in let
-        result = inlineTo' index' block ParagraphItem ls rs bs
-      in case result of
-          Nothing -> inlineTo index (inlineTo'' index' block ParagraphItem ls rs bs)
-          Just z -> Just z
+    in  inlineTo' index' block ParagraphItem ls rs bs
 -- Parse for Headering
-inlineTo index (Just (Headering br index' items, None, bs)) =
+inlineTo index (Headering br index' items, None, bs) =
     let (ls, rs) = break (zipperIs index) items
         block = Headering br index' items
     in  inlineTo' index' block (HeaderingItem br) ls rs bs
 -- Parse for Quote
-inlineTo index (Just (Quote index' items, None, bs)) =
+inlineTo index (Quote index' items, None, bs) =
     let (ls, rs) = break (zipperIs index) items
         block = Quote index' items
     in  inlineTo' index' block QuoteItem ls rs bs
 -- Parse for Italic
-inlineTo index (Just (block, Italic index' items, bs)) =
+inlineTo index (block, Italic index' items, bs) =
     let (ls, rs) = break (zipperIs index) items
     in  inlineTo' index' block ItalicItem ls rs bs
 -- Parse for Strong
-inlineTo index (Just (block, Strong index' items, bs)) = 
+inlineTo index (block, Strong index' items, bs) = 
     let (ls, rs) = break (zipperIs index) items
     in  inlineTo' index' block StrongItem ls rs bs
 
