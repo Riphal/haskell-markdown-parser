@@ -1,29 +1,123 @@
-import Data.List (break)  
+module Zipper
+  (
+    -- inlineUp
+    -- inlineTo,
+  ) where
 
-type Name = String
-type Data = String
+import Data.List (break)
+import Markdown
 
-data FSItem = File Name Data | Folder Name [FSItem] deriving (Show)
-data FSCrumb = FSCrumb Name [FSItem] [FSItem] deriving (Show)
+{-
+Markdown
+    Paragraph
+        Link
+        Image
+        Text
+        Italic
+            Link
+            Image
+            Text
+            Italic
+            Strong
+        Strong
+            Link
+            Image
+            Text
+            Italic
+            Strong
+        InlineCode
+    Headering
+        ...
+    Quote
+        ...
+    List
+        ...
+    Divider
+    Code
+-}
 
-type FSZipper = (FSItem, [FSCrumb])
+data MDItem = ParagraphItem
+            | HeaderingItem HeadingType
+            | QuoteItem
+            | OrderedListItem
+            | UnorderedListItem
 
-fsUp :: FSZipper -> FSZipper
-fsUp (item, FSCrumb name ls rs:bs) = (Folder name (ls ++ [item] ++ rs), bs)
+            -- Inline types
+            | ItalicItem
+            | StrongItem deriving (Show, Eq)
 
-fsTo :: Name -> FSZipper -> FSZipper
-fsTo name (Folder folderName items, bs) =
-    let (ls, item:rs) = break (nameIs name) items
-    in  (item, FSCrumb folderName ls rs:bs)
+data MDCrumb = MDCrumb Index MDItem [Inline] [Inline] deriving (Show)
 
-fsNewFile :: FSItem -> FSZipper -> FSZipper
-fsNewFile item (Folder folderName items, bs) =
-    (Folder folderName (item:items), bs)
+type Zipper = (Block, Inline, [MDCrumb])
 
-fsRename :: Name -> FSZipper -> FSZipper
-fsRename newName (Folder name items, bs) = (Folder newName items, bs)
-fsRename newName (File name dat, bs) = (File newName dat, bs)
+testTree :: Markdown
+testTree = [
+            Paragraph 6 [
+              Italic 2 [
+                Text 1 "Italic"
+              ],
+              Text 3 " \t",
+              Italic 5 [
+                Text 4 "Italic"
+              ]
+            ]
+          ]
 
-nameIs :: Name -> FSItem -> Bool
-nameIs name (Folder folderName _) = name == folderName
-nameIs name (File fileName _) = name == fileName
+-- run example: map inlineUp (map zipper testTree)
+zipper :: Block -> Zipper
+zipper b = (b, None, [])
+
+zipperUp :: Zipper -> Zipper
+-- First parse for all Blocks
+zipperUp (_, inline, (MDCrumb index ParagraphItem ls rs):bs) = (Paragraph index (ls ++ [inline] ++ rs), None, [])
+zipperUp (_, inline, (MDCrumb index (HeaderingItem br) ls rs):bs) = (Headering br index (ls ++ [inline] ++ rs), None, [])
+zipperUp (_, inline, (MDCrumb index QuoteItem ls rs):bs) = (Quote index (ls ++ [inline] ++ rs), None, [])
+zipperUp (_, inline, (MDCrumb index OrderedListItem ls rs):bs) = (List index OrderedList [(ls ++ [inline] ++ rs)], None, [])
+zipperUp (_, inline, (MDCrumb index UnorderedListItem ls rs):bs) = (List index UnorderedList [(ls ++ [inline] ++ rs)], None, [])
+
+zipperUp (block, inline, (MDCrumb index ItalicItem ls rs):bs) = (block, Italic index (ls ++ [inline] ++ rs), bs)
+zipperUp (block, inline, (MDCrumb index StrongItem ls rs):bs) = (block, Strong index (ls ++ [inline] ++ rs), bs)
+
+
+inlineTo :: Index -> Maybe Zipper -> Maybe Zipper
+-- Parse for Paragraph
+inlineTo index (Just (Paragraph index' items, None, bs)) =
+    let (ls, rs) = break (zipperIs index) items
+        block = Paragraph index' items
+    in let
+        result = inlineTo' index' block ParagraphItem ls rs bs
+      in case result of
+          Nothing -> inlineTo index (inlineTo'' index' block ParagraphItem ls rs bs)
+          Just z -> Just z
+-- Parse for Headering
+inlineTo index (Just (Headering br index' items, None, bs)) =
+    let (ls, rs) = break (zipperIs index) items
+        block = Headering br index' items
+    in  inlineTo' index' block (HeaderingItem br) ls rs bs
+-- Parse for Quote
+inlineTo index (Just (Quote index' items, None, bs)) =
+    let (ls, rs) = break (zipperIs index) items
+        block = Quote index' items
+    in  inlineTo' index' block QuoteItem ls rs bs
+-- Parse for Italic
+inlineTo index (Just (block, Italic index' items, bs)) =
+    let (ls, rs) = break (zipperIs index) items
+    in  inlineTo' index' block ItalicItem ls rs bs
+-- Parse for Strong
+inlineTo index (Just (block, Strong index' items, bs)) = 
+    let (ls, rs) = break (zipperIs index) items
+    in  inlineTo' index' block StrongItem ls rs bs
+
+
+inlineTo' :: Index -> Block -> MDItem -> [Inline] -> [Inline] -> [MDCrumb] -> Maybe Zipper
+inlineTo' _ _ _ _ [] _ = Nothing
+inlineTo' index block type' ls (item:rs) bs = Just (block, item, (MDCrumb index type' ls rs) : bs)
+
+
+zipperIs :: Index -> Inline -> Bool
+zipperIs index (Link index' _ _) = index' == index
+zipperIs index (Image index' _ _) = index' == index
+zipperIs index (Text index' _) = index' == index
+zipperIs index (Italic index' _) = index' == index
+zipperIs index (Strong index' _) = index' == index
+zipperIs index (InlineCode index' _) = index' == index

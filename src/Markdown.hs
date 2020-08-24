@@ -5,6 +5,7 @@ module Markdown
   , Inline(..)
   , ListType(..)
   , HeadingType
+  , Index
   ) where
 
 data Block = Paragraph Index [Inline]
@@ -21,7 +22,8 @@ data Inline = Link Index LinkName LinkAddress
             | Text Index String
             | Italic Index [Inline]
             | Strong Index [Inline]
-            | InlineCode Index Code deriving (Eq, Show)
+            | InlineCode Index Code
+            | None deriving (Eq, Show)
 
 data ListType = OrderedList | UnorderedList deriving (Eq, Show)
 
