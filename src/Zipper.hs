@@ -60,15 +60,6 @@ testTree = [
               Italic 5 [
                 Text 4 "Italic"
               ]
-            ],
-            Paragraph 7 [
-              Italic 8 [
-                Text 9 "Italic"
-              ],
-              Text 10 " \t",
-              Italic 11 [
-                Text 12 "Italic"
-              ]
             ]
           ]
 
@@ -88,35 +79,35 @@ zipperUp (block, inline, (MDCrumb index ItalicItem ls rs):bs) = (block, Italic i
 zipperUp (block, inline, (MDCrumb index StrongItem ls rs):bs) = (block, Strong index (ls ++ [inline] ++ rs), bs)
 
 
-inlineTo :: Index -> Zipper -> Maybe Zipper
+inlineTo' :: Index -> Zipper -> Maybe Zipper
 -- Parse for Paragraph
-inlineTo index (Paragraph index' items, None, bs) =
+inlineTo' index (Paragraph index' items, None, bs) =
     let (ls, rs) = break (zipperIs index) items
         block = Paragraph index' items
-    in  inlineTo' index' block ParagraphItem ls rs bs
+    in  inlineTo'' index' block ParagraphItem ls rs bs
 -- Parse for Headering
-inlineTo index (Headering br index' items, None, bs) =
+inlineTo' index (Headering br index' items, None, bs) =
     let (ls, rs) = break (zipperIs index) items
         block = Headering br index' items
-    in  inlineTo' index' block (HeaderingItem br) ls rs bs
+    in  inlineTo'' index' block (HeaderingItem br) ls rs bs
 -- Parse for Quote
-inlineTo index (Quote index' items, None, bs) =
+inlineTo' index (Quote index' items, None, bs) =
     let (ls, rs) = break (zipperIs index) items
         block = Quote index' items
-    in  inlineTo' index' block QuoteItem ls rs bs
+    in  inlineTo'' index' block QuoteItem ls rs bs
 -- Parse for Italic
-inlineTo index (block, Italic index' items, bs) =
-    let (ls, rs) = break (zipperIs index) items
-    in  inlineTo' index' block ItalicItem ls rs bs
+inlineTo' index (block, Italic index' (item:items), bs) =
+    let (ls, rs) = break (zipperIs index) [item]
+    in  inlineTo'' index' block ItalicItem ls rs bs
 -- Parse for Strong
-inlineTo index (block, Strong index' items, bs) = 
+inlineTo' index (block, Strong index' items, bs) = 
     let (ls, rs) = break (zipperIs index) items
-    in  inlineTo' index' block StrongItem ls rs bs
+    in  inlineTo'' index' block StrongItem ls rs bs
 
 
-inlineTo' :: Index -> Block -> MDItem -> [Inline] -> [Inline] -> [MDCrumb] -> Maybe Zipper
-inlineTo' _ _ _ _ [] _ = Nothing
-inlineTo' index block type' ls (item:rs) bs = Just (block, item, (MDCrumb index type' ls rs) : bs)
+inlineTo'' :: Index -> Block -> MDItem -> [Inline] -> [Inline] -> [MDCrumb] -> Maybe Zipper
+inlineTo'' _ _ _ _ [] _ = Nothing
+inlineTo'' index block type' ls (item:rs) bs = Just (block, item, (MDCrumb index type' ls rs) : bs)
 
 
 zipperIs :: Index -> Inline -> Bool
